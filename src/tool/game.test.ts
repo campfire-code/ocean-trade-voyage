@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateMap, findRoute } from './mapgen';
+import { clearInterrupts } from './sim';
 import { advance, clone, dockAt, newGame, rescue, settleWages, sailStep, tryDock, undock, waitDay, nearestDock } from './turn';
 import { buyGood, buyShip, buySupply, canBuildHere, currentMid, dismiss, listenRumors, recruit, recruitPrice, repairShip, rumorLines, sellGood, supplyPrice, tradeInValue, repairPrice } from './trade';
 import { closeQuarter, goalLabel, goalProgress, latchGoals, makeQuest, quarterName } from './quest';
@@ -17,6 +18,8 @@ function sailTo(s0: ReturnType<typeof fresh>, id: string) {
   if (s.docked) s = undock(s).state;
   const route = findRoute(map, s.pos, site(id).dock)!;
   for (const [x, y] of route) {
+    s = clearInterrupts(map, s);
+    if (s.docked) break;
     const r = sailStep(map, s, x - s.pos[0], y - s.pos[1]);
     expect(r.ok).toBe(true);
     s = r.state;

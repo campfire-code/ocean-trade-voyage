@@ -105,13 +105,15 @@ export interface ShipType {
   upwind: number;
   /** 买入此型号需要的声望 */
   rep: number;
+  /** 能装几门火炮 */
+  gunSlots: number;
   blurb: string;
 }
 export const SHIPS: ShipType[] = [
-  { id: 'lark', name: '雀鹞艇', tier: 1, price: 1500, cargo: 40, speed: 4.4, crewMin: 3, crewMax: 10, hull: 60, supply: 70, upwind: 0.6, rep: 0, blurb: '单桅小艇，船小灵活，适合跑短途' },
-  { id: 'swallow', name: '双桅燕', tier: 2, price: 5200, cargo: 90, speed: 4.1, crewMin: 6, crewMax: 22, hull: 100, supply: 150, upwind: 0.5, rep: 4, blurb: '双桅贸易船，载货与速度折中' },
-  { id: 'whale', name: '宽肚鲸商', tier: 3, price: 13500, cargo: 190, speed: 3.3, crewMin: 12, crewMax: 40, hull: 170, supply: 300, upwind: 0.38, rep: 10, blurb: '三桅宽船，能装很多货，但慢且怕逆风' },
-  { id: 'hawk', name: '破浪鹰', tier: 4, price: 19000, cargo: 125, speed: 5.3, crewMin: 10, crewMax: 30, hull: 120, supply: 230, upwind: 0.55, rep: 18, blurb: '远洋快船，船身狭长，跑得最快' },
+  { id: 'lark', name: '雀鹞艇', tier: 1, price: 1500, cargo: 40, speed: 4.4, crewMin: 3, crewMax: 10, hull: 60, supply: 70, upwind: 0.6, rep: 0, gunSlots: 3, blurb: '单桅小艇，船小灵活，适合跑短途' },
+  { id: 'swallow', name: '双桅燕', tier: 2, price: 5200, cargo: 90, speed: 4.1, crewMin: 6, crewMax: 22, hull: 100, supply: 150, upwind: 0.5, rep: 4, gunSlots: 5, blurb: '双桅贸易船，载货与速度折中' },
+  { id: 'whale', name: '宽肚鲸商', tier: 3, price: 13500, cargo: 190, speed: 3.3, crewMin: 12, crewMax: 40, hull: 170, supply: 300, upwind: 0.38, rep: 10, gunSlots: 9, blurb: '三桅宽船，能装很多货，但慢且怕逆风' },
+  { id: 'hawk', name: '破浪鹰', tier: 4, price: 19000, cargo: 125, speed: 5.3, crewMin: 10, crewMax: 30, hull: 120, supply: 230, upwind: 0.55, rep: 18, gunSlots: 7, blurb: '远洋快船，船身狭长，跑得最快' },
 ];
 export const SHIP_BY_ID: Record<string, ShipType> = Object.fromEntries(SHIPS.map((s) => [s.id, s]));
 

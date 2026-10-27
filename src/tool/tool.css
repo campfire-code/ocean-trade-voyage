@@ -80,3 +80,31 @@
 .ot-slot { display: grid; grid-template-columns: 78px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
 .ot-slot-info { font-size: .92em; min-width: 0; }
 .ot-field { display: grid; gap: 6px; }
+
+/* 船队与主线 */
+.ot-fleet-row { display: grid; gap: 2px; }
+.ot-fleet { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 8px; }
+.ot-fleet-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; display: grid; gap: 6px; background: var(--surface); }
+.ot-crew-row { display: grid; gap: 4px; padding-top: 4px; }
+.ot-tag.cond-festival { background: var(--warn-soft); color: var(--warn); }
+.ot-tag.cond-blockade { background: var(--err-soft); color: var(--err); }
+.ot-tag.cond-plague { background: var(--err-soft); color: var(--err); }
+.ot-scene-text { margin: 0; line-height: 1.7; user-select: text; white-space: pre-line; }
+.ot-choices { display: grid; gap: 8px; }
+.ot-choices .k-btn { justify-content: flex-start; height: auto; min-height: 34px; padding: 6px 12px; text-align: left; white-space: normal; }
+
+/* 海战 */
+.ot-battle { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+.ot-battle-top { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: start; }
+.ot-fighter { display: grid; gap: 4px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); min-width: 0; }
+.ot-fighter.foe { border-color: var(--err); }
+.ot-vs { display: grid; gap: 4px; justify-items: center; font-size: .9em; padding-top: 4px; }
+.ot-dist { display: inline-flex; align-items: center; gap: 4px; }
+.ot-battle-cv { width: 100%; flex: 0 1 auto; min-height: 0; border-radius: var(--radius-lg); border: 1px solid var(--line-strong); aspect-ratio: 960 / 300; max-height: 300px; object-fit: contain; align-self: center; }
+.ot-actions { flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+.k-btn.ot-act { height: auto; min-height: 52px; padding: 6px 10px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0 6px; text-align: left; white-space: normal; }
+.ot-act-sub { grid-column: 1 / -1; font-size: .78em; font-weight: 400; color: var(--muted); line-height: 1.3; }
+.ot-result { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: var(--radius-lg); background: var(--chip); }
+.ot-result.ok { background: var(--ok-soft); color: var(--ok); }
+.ot-result.bad { background: var(--err-soft); color: var(--err); }
+.ot-battle-log { flex: none; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }

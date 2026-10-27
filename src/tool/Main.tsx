@@ -1,18 +1,22 @@
 // 主界面：顶部状态条 + 海图 / 港口 + 右侧船只、货物、目标与航海日志。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Anchor, FilePlus2, Save, Star, Wind, Coins } from 'lucide-react';
+import { ArrowUp, Anchor, FilePlus2, Save, Star, Wind, Coins, BookOpen, Shield } from 'lucide-react';
 import { findRoute, generateMap, idx, isWater, inMap } from './mapgen';
 import { renderTerrain } from './render';
 import { SeaView } from './Sea';
 import { PortView } from './Port';
+import { BattleView } from './Battle';
+import { combatAct, type CombatAction } from './combat';
+import { SEA_EVENT_BY_ID, makeScene } from './events';
+import { storyStatus } from './story';
 import { Bar } from './parts';
 import { goalLabel, goalProgress, daysLeft, quarterName } from './quest';
 import { SLOT_COUNT, dropSlot, parseSave, putAuto, putSlot, readAuto, summarize, type Slots } from './save';
-import { sampleSea, samplePort } from './samples';
+import { sampleSea, samplePort, sampleBattle } from './samples';
 import { DIR_NAMES, STRENGTH_NAMES, dailySupply, windAt } from './sailing';
-import { cargoUsed, dateText, shipType, type GameState } from './state';
+import { cargoUsed, dateText, fleetCargoCap, fleetCrewMax, fleetShips, fleetSupplyCap, people, totalCrew, typeOf, type GameState } from './state';
 import { loadSlots, storeSlots } from './store';
-import { sailStep, tryDock, undock, newGame, waitDay, type StepResult } from './turn';
+import { sailStep, tryDock, undock, newGame, waitDay, endCombat, chooseScene, type StepResult } from './turn';
 import type { TradeResult } from './trade';
 import { GOOD_BY_ID, PORT_BY_ID, SHIP_BY_ID } from './world';
 import './tool.css';
@@ -32,6 +36,8 @@ export function Main() {
   const init = useMemo(() => {
     if (scene === 'port') return { state: samplePort(map), route: [] as [number, number][] };
     if (scene === 'sea') return sampleSea(map);
+    if (scene === 'event') { const e = sampleSea(map); e.state.scene = makeScene(SEA_EVENT_BY_ID.wreck); return e; }
+    if (scene === 'battle') return { state: sampleBattle(map), route: [] as [number, number][] };
     return { state: newGame(map), route: [] as [number, number][] };
   }, [map, scene]);
 
@@ -108,7 +114,7 @@ export function Main() {
       if (dialog || e.metaKey || e.ctrlKey || e.altKey || (t && /INPUT|TEXTAREA|SELECT/.test(t.tagName))) return;
       if (e.key === ' ') { setRoute([]); e.preventDefault(); return; }
       const d = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
-      if (!d || gameRef.current.docked) return;
+      if (!d || gameRef.current.docked || gameRef.current.combat || gameRef.current.scene) return;
       e.preventDefault();
       setRoute([]);
       step(d[0], d[1]);
@@ -118,7 +124,7 @@ export function Main() {
   }, [dialog, step]);
 
   const onTarget = (x: number, y: number) => {
-    if (game.docked) return;
+    if (game.docked || game.combat || game.scene) return;
     const site = map.sites.find((s) => Math.abs(s.land[0] - x) <= 1 && Math.abs(s.land[1] - y) <= 1);
     const to: [number, number] | null = site ? site.dock : inMap(x, y) && isWater(map.tiles[idx(x, y)]) ? [x, y] : null;
     if (!to) return say('那里是陆地，选一块海面', false);
@@ -129,9 +135,15 @@ export function Main() {
   };
 
   const act = (r: TradeResult) => { if (r.ok) setGame(r.state); say(r.msg, r.ok); };
+  const onCombat = (a: CombatAction) => {
+    const r = combatAct(gameRef.current, a);
+    if (!r.ok) return say(r.msg, false);
+    setGame(r.state);
+  };
+  const onEndCombat = () => afterStep(endCombat(map, gameRef.current));
+  const onScene = (i: number) => afterStep(chooseScene(map, gameRef.current, i));
   const canDock = !game.docked && map.sites.some((s) => s.dock[0] === game.pos[0] && s.dock[1] === game.pos[1]);
   const wind = windAt(game.seed, Math.floor(game.t));
-  const type = shipType(game);
 
   const saveTo = (slot: number) => {
     const n = putSlot(slots, slot, game);
@@ -165,7 +177,9 @@ export function Main() {
 
       <div className="ot-body">
         <div className="ot-main">
-          {game.docked ? (
+          {game.combat ? (
+            <BattleView game={game} onAct={onCombat} onEnd={onEndCombat} />
+          ) : game.docked ? (
             <PortView game={game} act={act} onLeave={() => afterStep(undock(game))} onWait={() => afterStep(waitDay(game))} />
           ) : (
             <SeaView map={map} terrain={terrain} game={game} route={route} facing={facing} onTarget={onTarget} canDock={canDock} onDock={() => afterStep(tryDock(map, game))} />
@@ -175,15 +189,20 @@ export function Main() {
 
         <aside className="ot-side k-scroll">
           <section className="ot-sec">
-            <h3><Anchor size={14} />{game.ship.name}<span className="ot-tag">{type.name}</span></h3>
-            <Bar value={game.ship.hull} max={type.hull} label={`船体 ${Math.round(game.ship.hull)}/${type.hull}`} />
-            <Bar value={game.ship.crew} max={type.crewMax} label={`船员 ${game.ship.crew}/${type.crewMax}`} tone={game.ship.crew <= type.crewMin ? 'err' : undefined} />
-            <Bar value={game.ship.food} max={type.supply} label={`食物 ${game.ship.food}（${Math.floor(game.ship.food / dailySupply(game.ship.crew))} 天）`} />
-            <Bar value={game.ship.water} max={type.supply} label={`淡水 ${game.ship.water}（${Math.floor(game.ship.water / dailySupply(game.ship.crew))} 天）`} />
-            <div className="k-muted ot-line">{game.docked ? `停靠：${PORT_BY_ID[game.docked].name}` : `位置：海图 (${game.pos[0]}, ${game.pos[1]})`}</div>
+            <h3><Anchor size={14} />{game.ship.name}<span className="ot-tag">{typeOf(game.ship).name}</span></h3>
+            {fleetShips(game).map((sh, i) => (
+              <div key={i} className="ot-fleet-row">
+                {i > 0 && <span className="k-muted ot-line">{sh.name} · {typeOf(sh).name} · 船员 {sh.crew} · 炮 {sh.guns}{sh.armor ? ` · 甲 ${sh.armor}` : ''}</span>}
+                <Bar value={sh.hull} max={typeOf(sh).hull} label={i === 0 ? `船体 ${Math.round(sh.hull)}/${typeOf(sh).hull} · 炮 ${sh.guns}${sh.armor ? ` · 甲 ${sh.armor}` : ''}` : `${sh.name} 船体 ${Math.round(sh.hull)}/${typeOf(sh).hull}`} />
+              </div>
+            ))}
+            <Bar value={totalCrew(game)} max={fleetCrewMax(game)} label={`船员 ${totalCrew(game)}/${fleetCrewMax(game)}${game.guards ? ` · 护卫 ${game.guards}` : ''}`} tone={fleetShips(game).some((x) => x.crew <= typeOf(x).crewMin) ? 'err' : undefined} />
+            <Bar value={game.ship.food} max={fleetSupplyCap(game)} label={`食物 ${game.ship.food}（${Math.floor(game.ship.food / dailySupply(people(game)))} 天）`} />
+            <Bar value={game.ship.water} max={fleetSupplyCap(game)} label={`淡水 ${game.ship.water}（${Math.floor(game.ship.water / dailySupply(people(game)))} 天）`} />
+            <div className="k-muted ot-line">{game.docked ? `停靠：${PORT_BY_ID[game.docked].name}` : `位置：海图 (${game.pos[0]}, ${game.pos[1]})`}{game.consorts.length ? ` · 船队 ${game.consorts.length + 1} 艘` : ''}</div>
           </section>
           <section className="ot-sec">
-            <h3>货舱 <span className="k-muted k-num">{cargoUsed(game)}/{type.cargo}</span></h3>
+            <h3>货舱 <span className="k-muted k-num">{cargoUsed(game)}/{fleetCargoCap(game)}</span></h3>
             {Object.keys(game.cargo).length === 0 && <div className="k-muted ot-line">空的</div>}
             {Object.entries(game.cargo).map(([id, c]) => (
               <div key={id} className="ot-cargo"><span>{GOOD_BY_ID[id].name}</span><span className="k-num">{c.qty} 件 · 均价 {Math.round(c.cost)}</span></div>
@@ -199,6 +218,7 @@ export function Main() {
             ))}
             <div className="k-muted ot-line">季度末结算：达成有奖金和声望，未达成扣声望。</div>
           </section>
+          <StorySection game={game} />
           <section className="ot-sec">
             <h3>航海日志</h3>
             <ol className="ot-log">{[...game.log].reverse().slice(0, 8).map((l, i) => <li key={i}>{l}</li>)}</ol>
@@ -206,8 +226,43 @@ export function Main() {
         </aside>
       </div>
 
+      {game.scene && !game.combat && <SceneDialog game={game} onChoose={onScene} />}
       {dialog === 'save' && <SaveDialog slots={slots} onClose={() => setDialog(null)} onSave={saveTo} onLoad={loadFrom} onDrop={removeSlot} />}
       {dialog === 'new' && <NewDialog onClose={() => setDialog(null)} onStart={startNew} />}
+    </div>
+  );
+}
+
+function StorySection({ game }: { game: GameState }) {
+  const st = storyStatus(game);
+  return (
+    <section className="ot-sec">
+      <h3><BookOpen size={14} />主线「潮汐账」<span className="ot-tag">{st.chapterNo}/{st.total}</span></h3>
+      <div className="ot-goal">
+        <div><b>{st.title}</b></div>
+        <div>{st.objective}</div>
+        {st.progress && <div className="k-muted ot-line">{st.progress}</div>}
+        {st.locked && <div className="k-muted ot-line">{st.locked}</div>}
+      </div>
+    </section>
+  );
+}
+
+function SceneDialog({ game, onChoose }: { game: GameState; onChoose: (i: number) => void }) {
+  const sc = game.scene!;
+  const def = SEA_EVENT_BY_ID[sc.id];
+  return (
+    <div className="ot-modal">
+      <div className="ot-dialog" role="dialog" aria-label={sc.title}>
+        <div className="ot-dialog-head"><b><Shield size={15} /> {sc.title}</b></div>
+        <p className="ot-scene-text">{sc.text}</p>
+        <div className="ot-choices">
+          {sc.choices.map((c, i) => {
+            const need = def?.choices[i]?.needGold ?? 0;
+            return <button key={i} className="k-btn" disabled={game.gold < need} onClick={() => onChoose(i)}>{c}{game.gold < need ? '（金币不够）' : ''}</button>;
+          })}
+        </div>
+      </div>
     </div>
   );
 }

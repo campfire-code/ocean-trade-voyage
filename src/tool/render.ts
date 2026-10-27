@@ -2,7 +2,7 @@
 import { T_DEEP, T_GRASS, T_HILL, T_SAND, T_SHALLOW, idx, inMap, isWater, type SeaMap } from './mapgen';
 import { rand01 } from './rng';
 import { REGIONS, PORT_BY_ID } from './world';
-import { REL_MIN, type GameState } from './state';
+import { REL_MIN, dayNumber, type GameState } from './state';
 import { windAt } from './sailing';
 
 export const ART = 8; // 地形每格的像素数
@@ -83,7 +83,7 @@ function drawHouse(g: CanvasRenderingContext2D, cx: number, cy: number, roof: st
   g.fillStyle = '#e24a3b'; g.fillRect(cx + w / 2 + 3, cy - 9, 4, 3);
 }
 
-export function drawShip(g: CanvasRenderingContext2D, cx: number, cy: number, facing: 1 | -1, windTo: number) {
+export function drawShip(g: CanvasRenderingContext2D, cx: number, cy: number, facing: 1 | -1, windTo: number, foe = false) {
   g.save();
   g.translate(cx, cy);
   g.scale(facing, 1);
@@ -93,11 +93,12 @@ export function drawShip(g: CanvasRenderingContext2D, cx: number, cy: number, fa
   g.fillStyle = '#3b2a20'; g.fillRect(-1, -11, 2, 12);
   // 帆随风向微微鼓起：顺风时鼓得更大
   const lean = windTo === 2 || windTo === 1 || windTo === 3 ? 2 : 0;
-  g.fillStyle = '#f7f3e6';
+  g.fillStyle = foe ? '#3a3a46' : '#f7f3e6';
   g.beginPath(); g.moveTo(1, -10); g.lineTo(8 + lean, -2); g.lineTo(1, -2); g.closePath(); g.fill();
-  g.fillStyle = '#e9e2cc';
+  g.fillStyle = foe ? '#2a2a34' : '#e9e2cc';
   g.beginPath(); g.moveTo(-1, -9); g.lineTo(-6, -2); g.lineTo(-1, -2); g.closePath(); g.fill();
-  g.fillStyle = '#d6573f'; g.fillRect(1, -12, 5, 2);
+  g.fillStyle = foe ? '#111' : '#d6573f'; g.fillRect(1, -12, 5, 2);
+  if (foe) { g.fillStyle = '#eee'; g.fillRect(3, -11, 1, 1); }
   g.restore();
 }
 
@@ -149,12 +150,54 @@ export function drawScene(cv: HTMLCanvasElement, terrain: HTMLCanvasElement, map
     g.fillStyle = '#9a6b3f';
     g.fillRect(site.dock[0] * TILE + 4, site.dock[1] * TILE + 4, TILE - 8, TILE - 8);
     const est = (s.relations[site.id] ?? 0) >= REL_MIN;
-    label(g, p.name + (est ? ' ★' : ''), cx, cy - 12, 13);
+    const cond = s.conds.find((c) => c.port === site.id && c.until >= dayNumber(s));
+    const tag = cond ? ({ festival: ' 庆', blockade: ' 封', plague: ' 疫' } as const)[cond.kind] : '';
+    label(g, p.name + (est ? ' ★' : '') + tag, cx, cy - 12, 13);
   }
 
   // 船
   const [sx, sy] = s.pos;
   const windTo = (windAt(s.seed, Math.floor(s.t)).from + 4) % 8;
+  s.consorts.forEach((_, i) => drawShip(g, sx * TILE + TILE / 2 - o.facing * (14 + i * 13), sy * TILE + TILE / 2 + 2 + i * 3, o.facing, windTo));
   drawShip(g, sx * TILE + TILE / 2, sy * TILE + TILE / 2 - 2, o.facing, windTo);
+}
+
+/** 海战画面：两方船按距离拉开，炮击时冒烟 */
+export function drawBattle(cv: HTMLCanvasElement, s: GameState) {
+  const c = s.combat;
+  const g = cv.getContext('2d')!;
+  const W = cv.width, H = cv.height;
+  g.imageSmoothingEnabled = false;
+  const sky = g.createLinearGradient(0, 0, 0, H * 0.45);
+  sky.addColorStop(0, '#9fcbe8'); sky.addColorStop(1, '#d9eef6');
+  g.fillStyle = sky; g.fillRect(0, 0, W, H * 0.45);
+  const sea = g.createLinearGradient(0, H * 0.45, 0, H);
+  sea.addColorStop(0, '#2c7fa8'); sea.addColorStop(1, '#17466e');
+  g.fillStyle = sea; g.fillRect(0, H * 0.45, W, H * 0.55);
+  g.fillStyle = 'rgba(255,255,255,.16)';
+  for (let i = 0; i < 40; i++) {
+    const x = (i * 97) % W, y = H * 0.48 + ((i * 53) % (H * 0.5));
+    g.fillRect(x, y, 14 + (i % 3) * 6, 2);
+  }
+  if (!c) return;
+  const gap = [0, 110, 210, 310, 410][c.dist];
+  const mx = W / 2 - gap / 2 - 30, fx = W / 2 + gap / 2 + 30;
+  const y = H * 0.66;
+  const windTo = (windAt(s.seed, Math.floor(s.t)).from + 4) % 8;
+  const SC = 4;
+  g.save(); g.scale(SC, SC);
+  s.consorts.forEach((_, i) => drawShip(g, (mx - 52 - i * 44) / SC, (y + 16 + i * 14) / SC, 1, windTo));
+  drawShip(g, mx / SC, y / SC, 1, windTo);
+  drawShip(g, fx / SC, y / SC, -1, windTo, true);
+  g.restore();
+  const last = c.log[c.log.length - 1] ?? '';
+  const smoke = (x: number) => {
+    g.fillStyle = 'rgba(240,240,240,.75)';
+    for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(x + i * 9, y - 18 - i * 6, 8 + i * 2, 0, 7); g.fill(); }
+    g.fillStyle = '#ffd36a'; g.fillRect(x - 4, y - 14, 8, 6);
+  };
+  if (/我方.*(齐射|命中)/.test(last)) smoke(mx + 40);
+  if (/敌船.*开火/.test(last)) smoke(fx - 80);
+  if (c.dist === 1) { g.fillStyle = '#6a4228'; g.fillRect(mx + 36, y - 6, fx - mx - 72, 4); }
 }
 

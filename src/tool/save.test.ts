@@ -37,7 +37,7 @@ describe('存档序列化', () => {
   });
   it('版本不对被拒绝', () => {
     const o = JSON.parse(serializeSave(play()));
-    o.state.v = 2;
+    o.state.v = 99;
     const r = parseSave(JSON.stringify(o));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/版本/);
