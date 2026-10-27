@@ -1,0 +1,13 @@
+{
+  "id": "x01",
+  "slug": "ocean-trade-voyage",
+  "name": "原创航海经商游戏",
+  "version": "0.1.0",
+  "repo": "campfire-code/ocean-trade-voyage",
+  "license": "MIT",
+  "ui": {
+    "layout": "b",
+    "palette": "teal"
+  },
+  "upstream": null
+}
