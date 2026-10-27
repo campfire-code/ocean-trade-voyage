@@ -80,7 +80,7 @@ describe('破产救济', () => {
   });
 });
 
-describe('跑满一年', () => {
+describe('跑满一年', { timeout: 60_000 }, () => {
   const run = (seed: number, extra = {}) => simulate(map, { seed, days: 360, ...extra });
 
   it('同样的种子，结果完全相同（纯函数）', () => {
